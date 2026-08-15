@@ -38,8 +38,10 @@ public abstract class SteamWorkableMachineMixin implements IRecipeVersionHolder 
         IO io = handlerList.getHandlerIO();
         versions.topologyVersion++;
         if (io.support(IO.IN)) versions.inputVersion++;
+        if (io.support(IO.OUT)) versions.outputVersion++;
         return handlerList.subscribe(() -> {
             if (io.support(IO.IN)) versions.inputVersion++;
+            if (io.support(IO.OUT)) versions.outputVersion++;
             listener.run();
         });
     }

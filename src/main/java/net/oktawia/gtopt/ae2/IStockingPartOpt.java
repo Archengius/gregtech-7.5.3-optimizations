@@ -83,6 +83,21 @@ public interface IStockingPartOpt extends IMEStockingPart {
         return anyChanged;
     }
 
+    default boolean gtopt$clearOrphanedStock() {
+        IConfigurableSlotList slots = getSlotList();
+        boolean anyChanged = false;
+        for (int i = 0; i < slots.getConfigurableSlots(); i++) {
+            IConfigurableSlot slot = slots.getConfigurableSlot(i);
+            if (slot.getConfig() != null) {
+                continue;
+            }
+            if (((IStockSilent) slot).gtopt$setStockSilent(null)) {
+                anyChanged = true;
+            }
+        }
+        return anyChanged;
+    }
+
     default void gtopt$notifyStockChanged() {
         gtopt$notifySlotList(getSlotList());
     }

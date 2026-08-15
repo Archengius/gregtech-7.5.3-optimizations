@@ -61,17 +61,26 @@ public class BufferRecipeHandlerList extends RecipeHandlerList {
                 continue;
             }
             Map<RecipeCapability<?>, List<Object>> left = consume(worker, io, recipe, contents, true);
-            if (!left.isEmpty()) {
+            if (hasUnconsumedItemsOrFluids(left)) {
                 continue;
             }
             return simulate ? left : consume(worker, io, recipe, contents, false);
         }
 
         Map<RecipeCapability<?>, List<Object>> shared = consume(null, io, recipe, contents, true);
-        if (!shared.isEmpty()) {
+        if (hasUnconsumedItemsOrFluids(shared)) {
             return contents;
         }
         return simulate ? shared : consume(null, io, recipe, contents, false);
+    }
+
+    private static boolean hasUnconsumedItemsOrFluids(Map<RecipeCapability<?>, List<Object>> left) {
+        List<Object> items = left.get(ItemRecipeCapability.CAP);
+        if (items != null && !items.isEmpty()) {
+            return true;
+        }
+        List<Object> fluids = left.get(FluidRecipeCapability.CAP);
+        return fluids != null && !fluids.isEmpty();
     }
 
     private Map<RecipeCapability<?>, List<Object>> consume(@Nullable BufferWorker worker, IO io, GTRecipe recipe,
@@ -85,7 +94,7 @@ public class BufferRecipeHandlerList extends RecipeHandlerList {
                     continue;
                 }
                 var left = handler.handleRecipe(io, recipe, entry.getValue(), simulate);
-                if (left == null) {
+                if (left == null || left.isEmpty()) {
                     it.remove();
                     break;
                 }

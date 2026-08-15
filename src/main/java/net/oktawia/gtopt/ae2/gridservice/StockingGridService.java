@@ -39,7 +39,7 @@ public class StockingGridService implements IStockingService, IGridServiceProvid
     private final Set<IStockingPartOpt> pendingRefresh = Collections.newSetFromMap(new IdentityHashMap<>());
     private final Set<IStockingPartOpt> pendingAutoPull = Collections.newSetFromMap(new IdentityHashMap<>());
     private final Map<IStockingPartOpt, Set<AEKey>> pendingStockUpdates = new IdentityHashMap<>();
-    private final Set<IStockingPartOpt> pendingImmediate = Collections.newSetFromMap(new IdentityHashMap<>());
+    private final Set<IStockingPartOpt> pendingNotify = Collections.newSetFromMap(new IdentityHashMap<>());
 
     public StockingGridService(IGrid grid) {
         this.grid = grid;
@@ -82,7 +82,7 @@ public class StockingGridService implements IStockingService, IGridServiceProvid
         pendingRefresh.remove(part);
         pendingAutoPull.remove(part);
         pendingStockUpdates.remove(part);
-        pendingImmediate.remove(part);
+        pendingNotify.remove(part);
 
         Set<AEKey> keys = partKeys.remove(part);
         if (keys != null) {
@@ -115,6 +115,7 @@ public class StockingGridService implements IStockingService, IGridServiceProvid
         processPendingRegistrations(cached);
         detectStockChanges(cached);
         applyStockUpdates(cached);
+        flushNotifications();
     }
 
     private void processAutoPull(KeyCounter cached) {
@@ -188,22 +189,10 @@ public class StockingGridService implements IStockingService, IGridServiceProvid
         while (iterator.hasNext()) {
             var entry = iterator.next();
             IStockingPartOpt part = entry.getKey();
-
-            if (!parts.contains(part)) {
-                iterator.remove();
-                pendingImmediate.remove(part);
-                continue;
-            }
-
-            if (part.isOnline() && !part.gtopt$isCycleDue() && !pendingImmediate.contains(part)) {
-                continue;
-            }
-
             Set<AEKey> keys = entry.getValue();
             iterator.remove();
-            pendingImmediate.remove(part);
 
-            if (keys.isEmpty()) {
+            if (!parts.contains(part) || keys.isEmpty()) {
                 continue;
             }
 
@@ -227,8 +216,31 @@ public class StockingGridService implements IStockingService, IGridServiceProvid
             }
 
             if (part.gtopt$applyStockSilent(changes)) {
-                part.gtopt$notifyStockChanged();
+                pendingNotify.add(part);
             }
+        }
+    }
+
+    private void flushNotifications() {
+        if (pendingNotify.isEmpty()) {
+            return;
+        }
+
+        var iterator = pendingNotify.iterator();
+        while (iterator.hasNext()) {
+            IStockingPartOpt part = iterator.next();
+
+            if (!parts.contains(part)) {
+                iterator.remove();
+                continue;
+            }
+
+            if (part.isOnline() && !part.gtopt$isCycleDue()) {
+                continue;
+            }
+
+            iterator.remove();
+            part.gtopt$notifyStockChanged();
         }
     }
 
@@ -264,7 +276,10 @@ public class StockingGridService implements IStockingService, IGridServiceProvid
             partKeys.remove(part);
         } else {
             partKeys.put(part, newKeys);
-            pendingImmediate.add(part);
+        }
+
+        if (part.gtopt$clearOrphanedStock()) {
+            pendingNotify.add(part);
         }
     }
 

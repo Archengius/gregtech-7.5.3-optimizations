@@ -9,6 +9,7 @@ import java.util.Map;
 public final class RecipeCapabilityVersions {
 
     public int inputVersion;
+    public int outputVersion;
     public int topologyVersion;
 
     public int cachedGroupsVersionIn = -1;

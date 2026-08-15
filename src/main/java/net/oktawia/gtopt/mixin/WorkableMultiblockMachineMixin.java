@@ -40,8 +40,10 @@ public abstract class WorkableMultiblockMachineMixin implements IRecipeVersionHo
         IO io = handlerList.getHandlerIO();
         versions.topologyVersion++;
         if (io.support(IO.IN)) versions.inputVersion++;
+        if (io.support(IO.OUT)) versions.outputVersion++;
         return handlerList.subscribe(() -> {
             if (io.support(IO.IN)) versions.inputVersion++;
+            if (io.support(IO.OUT)) versions.outputVersion++;
             listener.run();
         });
     }
@@ -53,5 +55,6 @@ public abstract class WorkableMultiblockMachineMixin implements IRecipeVersionHo
         RecipeCapabilityVersions versions = gtopt$getRecipeVersions();
         versions.topologyVersion++;
         versions.inputVersion++;
+        versions.outputVersion++;
     }
 }

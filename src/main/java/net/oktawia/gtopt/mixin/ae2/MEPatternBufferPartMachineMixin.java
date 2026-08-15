@@ -31,6 +31,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
@@ -95,6 +96,7 @@ public abstract class MEPatternBufferPartMachineMixin implements IPatternBufferO
     private void gtopt$decodePatternsOnLoad(CallbackInfo ci) {
         if (((MEPatternBufferPartMachine) (Object) this).getLevel() instanceof ServerLevel serverLevel) {
             serverLevel.getServer().tell(new TickTask(1, () -> {
+                gtopt$revalidateInventory();
                 int slots = Math.min(patternInventory.getSlots(), gtopt$patternSlotDetails.length);
                 for (int i = 0; i < slots; i++) {
                     gtopt$patternSlotDetails[i] = PatternDetailsHelper.decodePattern(
@@ -111,6 +113,7 @@ public abstract class MEPatternBufferPartMachineMixin implements IPatternBufferO
             at = @At("HEAD"),
             cancellable = true)
     private void gtopt$useBufferHandler(CallbackInfoReturnable<List<RecipeHandlerList>> cir) {
+        gtopt$revalidateInventory();
         cir.setReturnValue(gtopt$bufferHandlers);
     }
 
@@ -122,6 +125,10 @@ public abstract class MEPatternBufferPartMachineMixin implements IPatternBufferO
         ci.cancel();
         var self = (MEPatternBufferPartMachine) (Object) this;
         if (self.isRemote()) {
+            return;
+        }
+        gtopt$revalidateInventory();
+        if (index < 0 || index >= gtopt$patternSlotDetails.length) {
             return;
         }
         IPatternDetails oldPattern = gtopt$patternSlotDetails[index];
@@ -145,6 +152,7 @@ public abstract class MEPatternBufferPartMachineMixin implements IPatternBufferO
             at = @At("HEAD"),
             cancellable = true)
     private void gtopt$getAvailablePatterns(CallbackInfoReturnable<List<IPatternDetails>> cir) {
+        gtopt$revalidateInventory();
         List<IPatternDetails> patterns = new ArrayList<>(gtopt$patternSlotDetails.length);
         for (IPatternDetails details : gtopt$patternSlotDetails) {
             if (details != null) {
@@ -161,6 +169,7 @@ public abstract class MEPatternBufferPartMachineMixin implements IPatternBufferO
     private void gtopt$pushPattern(IPatternDetails patternDetails, KeyCounter[] inputHolder,
                                    CallbackInfoReturnable<Boolean> cir) {
         MEPatternBufferPartMachine self = (MEPatternBufferPartMachine) (Object) this;
+        gtopt$revalidateInventory();
         if (!self.isFormed() || !self.getMainNode().isActive() || !checkInput(inputHolder)) {
             cir.setReturnValue(false);
             return;
@@ -209,6 +218,7 @@ public abstract class MEPatternBufferPartMachineMixin implements IPatternBufferO
             method = "update",
             at = @At("TAIL"))
     private void gtopt$trimOnUpdate(CallbackInfo ci) {
+        gtopt$revalidateInventory();
         gtopt$trimSurplusWorkers();
     }
 
@@ -239,6 +249,23 @@ public abstract class MEPatternBufferPartMachineMixin implements IPatternBufferO
     @Override
     public AggregateFluidHandler gtopt$getAggregateFluidHandler() {
         return gtopt$aggregateFluidHandler;
+    }
+
+    @Unique
+    private void gtopt$revalidateInventory() {
+        InternalSlot[] current = internalInventory;
+        if (gtopt$patternSlotDetails.length != current.length) {
+            gtopt$patternSlotDetails = Arrays.copyOf(gtopt$patternSlotDetails, current.length);
+        }
+        if (gtopt$workers.isEmpty() || gtopt$workers.get(0).getSlot() == current[0]) {
+            return;
+        }
+        int count = Math.min(gtopt$workers.size(), current.length);
+        gtopt$workers.clear();
+        for (int i = 0; i < count; i++) {
+            gtopt$addWorker();
+        }
+        gtopt$onSlotChanged();
     }
 
     @Unique

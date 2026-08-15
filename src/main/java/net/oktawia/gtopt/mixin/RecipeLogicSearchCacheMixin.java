@@ -6,6 +6,7 @@ import com.gregtechceu.gtceu.api.recipe.GTRecipe;
 
 import net.minecraft.network.chat.Component;
 import net.oktawia.gtopt.recipe.IRecipeVersionHolder;
+import net.oktawia.gtopt.recipe.RecipeCapabilityVersions;
 
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -37,10 +38,19 @@ public abstract class RecipeLogicSearchCacheMixin {
     protected Map<GTRecipe, Component> failureReasonMap;
 
     @Shadow
+    protected boolean recipeDirty;
+
+    @Shadow
     public abstract void findAndHandleRecipe();
 
     @Unique
     private int gtopt$lastEmptySearchInputVersion = -1;
+
+    @Unique
+    private int gtopt$lastEmptySearchOutputVersion = -1;
+
+    @Unique
+    private int gtopt$lastEmptySearchRecipeType = -1;
 
     @Redirect(
               method = "serverTick",
@@ -53,13 +63,21 @@ public abstract class RecipeLogicSearchCacheMixin {
             findAndHandleRecipe();
             return;
         }
-        int inputVersion = holder.gtopt$getRecipeVersions().inputVersion;
-        if (lastFailedMatches == null && gtopt$lastEmptySearchInputVersion == inputVersion) {
+        RecipeCapabilityVersions versions = holder.gtopt$getRecipeVersions();
+        int inputVersion = versions.inputVersion;
+        int outputVersion = versions.outputVersion;
+        int recipeType = machine.getActiveRecipeType();
+        if (!recipeDirty && lastFailedMatches == null &&
+                gtopt$lastEmptySearchInputVersion == inputVersion &&
+                gtopt$lastEmptySearchOutputVersion == outputVersion &&
+                gtopt$lastEmptySearchRecipeType == recipeType) {
             return;
         }
         findAndHandleRecipe();
         if (lastRecipe == null && lastFailedMatches == null && failureReasonMap.isEmpty()) {
             gtopt$lastEmptySearchInputVersion = inputVersion;
+            gtopt$lastEmptySearchOutputVersion = outputVersion;
+            gtopt$lastEmptySearchRecipeType = recipeType;
         }
     }
 
@@ -68,5 +86,7 @@ public abstract class RecipeLogicSearchCacheMixin {
             at = @At("HEAD"))
     private void gtopt$resetSearchCache(CallbackInfo ci) {
         gtopt$lastEmptySearchInputVersion = -1;
+        gtopt$lastEmptySearchOutputVersion = -1;
+        gtopt$lastEmptySearchRecipeType = -1;
     }
 }
