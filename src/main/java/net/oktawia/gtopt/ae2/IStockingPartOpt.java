@@ -150,6 +150,16 @@ public interface IStockingPartOpt extends IMEStockingPart {
         }
     }
 
+    default void gtopt$markStockDirty(AEKey key) {
+        if (self().isRemote()) {
+            return;
+        }
+        IGrid grid = getMainNode().getGrid();
+        if (grid != null) {
+            grid.getService(IStockingService.class).markStockDirty(this, key);
+        }
+    }
+
     default void gtopt$markForAutoPull() {
         if (self().isRemote()) {
             return;

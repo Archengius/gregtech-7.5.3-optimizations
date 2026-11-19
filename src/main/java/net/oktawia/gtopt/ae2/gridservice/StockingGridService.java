@@ -77,6 +77,17 @@ public class StockingGridService implements IStockingService, IGridServiceProvid
         }
     }
 
+    // The part extracted this key and decremented its own stock. Re-simulate it next tick even if the
+    // grid amount looks unchanged, since the source may have been refilled within the same tick
+    // (e.g. a storage bus on a configured ME Interface), which detectStockChanges cannot see.
+    @Override
+    public void markStockDirty(IStockingPartOpt part, AEKey key) {
+        Set<AEKey> keys = partKeys.get(part);
+        if (keys != null && keys.contains(key)) {
+            pendingStockUpdates.computeIfAbsent(part, ignored -> new HashSet<>()).add(key);
+        }
+    }
+
     private void unregister(IStockingPartOpt part) {
         parts.remove(part);
         pendingRefresh.remove(part);
